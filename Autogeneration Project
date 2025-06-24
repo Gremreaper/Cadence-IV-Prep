@@ -1,0 +1,1436 @@
+1.perl autogen regresion script
+
+#! /dv/tools/bin/perl
+
+use strict;
+use warnings;
+use Data::Dumper;
+use Term::ANSIColor;
+use Cwd qw(getcwd);
+use Getopt::Long;                      # Command-line options
+use File::Path;
+use File::Copy;
+
+our ($opt_help, $opt_tests, $opt_testPath, $opt_testLog);
+our @options = ("--pack", "--unpack", "--scope", "--proc_kind", "--varstate", "--dtp", "--num_modules", "--disable_nets", "--escape_name", "--enable_oomrs", "--enable_parameters", "--bitFactor", "--inst_limit", "--designVars", "--portConvention", "--enable_GenScope", "--svIntent", "--uvm", "--enable_implicit", "--enable_assertions", "--enable_coverage", "--disable_proc", "--st_kind", "--disable_st_kind", "--struct_union", "--enable_config", "--vh_scaling", "--disable_contassign","--disable_StUn_array", "--enable_cb","--enable_const_expr_dim", "--enable_glsgen","--enable_aoi","--enable_generate");
+our @param_sub_options = ("--disable_scope_params", "--disable_port_params", "--disable_local_params", "--disable_value_params", "", "", "", "", "", "", "", "");
+our @struct_sub_options = ("--disable_struct", "--disable_union", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "");
+our @scopes = ("interface", "program", "package");
+our @scaling = ("--designs", "--hexpand", "--vexpand");
+our @procs  = ("always_ltch", "always_cmb", "always_str", "always_sig", "always_clk", "always_ff", "initial", "final");
+our @varstate = ("2", "4", "all");
+our @dtps = ("scalar", "vector", "array", "mda","struct","union");
+our @st_kinds = ("assign", "passign", "if_else", "for", "foreach", "forever", "while", "do_while", "repeat", "fork_join", "wait", "wait_event", "event_trigger", "cb_delay");
+our @sv_intents = ("sTs", "sMs", "dMix", "dRotate","dSplit","dRotate","cellgls");
+our @du_header = ("ansi", "nansi");
+our @factors  = ("8", "16", "64", "128", "256");
+our @choice   = ("yes","no");
+our @gls_options = ("--enable_sdf");#,"--enable_tfile","--enable_tcl_file");  //support pending for tfile and tcl file
+our @sdf_options = ("--enable_sdf_annotate","--enable_cmd_file");
+
+GetOptions(
+           "help"         => \$opt_help,
+           "tests=i"      => \$opt_tests,
+           "testpath=s"   => \$opt_testPath,
+           "logfile=s"    => \$opt_testLog,
+          ) or pod2usage(1);
+pod2usage(1) if ($opt_help);
+
+our $TOOL_PATH = getcwd;
+
+$opt_tests=1 if (not defined $opt_tests);
+$opt_testPath="tests" if (not defined $opt_testPath);
+$opt_testLog ="run.log" if (not defined $opt_testLog);
+
+`rm -f $TOOL_PATH/$opt_testLog`;
+rmtree ("$opt_testPath");
+
+for (my $i = 1; $i <= $opt_tests; $i = $i + 1) {
+  our $cmdLine = "--AVSREQ_149924 --AVSREQ_149663 --AVSREQ_150172 --AVSREQ-153028 ";
+  print ("Geneating test - $i/$opt_tests\n");
+  my $test_dir = "$opt_testPath/ag_".$i;
+  mkpath ($test_dir);
+  my $noOptions = int(rand(8));
+
+  for (my $j = 0; $j < $noOptions; $j = $j + 1) {
+    my $opt = $main::options[rand(@main::options)];
+    $cmdLine .= " $opt ";
+    if ($opt eq "--pack") {
+      my $num_dim = int(rand(2)+1);
+      for (my $dim = 0; $dim < $num_dim; $dim = $dim + 1) {
+        $cmdLine .= " ".int(rand(2)+1);
+      }
+    }
+    if ($opt eq "--unpack") {
+      my $num_dim = int(rand(2)+1);
+      for (my $dim = 0; $dim < $num_dim; $dim = $dim + 1) {
+        $cmdLine .= " ".int(rand(2)+1);
+      }
+    }
+    if ($opt eq "--inst_limit") {
+      $cmdLine .= " ".int(rand(4)+1);
+    }
+    if ($opt eq "--designVars") {
+      $cmdLine .= " ".int(rand(10)+1);
+    }
+    if ($opt eq "--num_modules") {
+      $cmdLine .= " ".int(rand(7)+1);
+    }
+#    if ($opt eq "--num_interfaces") {
+#      $cmdLine .= " ".int(rand(5)+1);
+#    }
+    if ($opt eq "--scope") {
+      my $tmp_scope;
+      $cmdLine .= " module ";
+      $tmp_scope = $main::scopes[rand(@main::scopes)];
+      $cmdLine .= "$tmp_scope ";
+      if ($tmp_scope eq "interface") {
+        $cmdLine .= " --num_interfaces ". int(rand(5)+1);
+      }
+      if ($tmp_scope eq "program") {
+        $cmdLine .= " --num_programs ".int(rand(5)+1);
+      }
+    }
+    if ($opt eq "--dtp") {
+      $cmdLine .= " ";
+      $cmdLine .= $main::dtps[rand(@main::dtps)];
+    }
+    if ($opt eq "--proc_kind") {
+      $cmdLine .= " ";
+      $cmdLine .= $main::procs[rand(@main::procs)];
+    }
+    if ($opt eq "--varstate") {
+      $cmdLine .= " ";
+      $cmdLine .= $main::varstate[rand(@main::varstate)];
+    }
+    if ($opt eq "--portConvention") {
+      $cmdLine .= " ";
+      $cmdLine .= $main::du_header[rand(@main::du_header)];
+    }
+    if ($opt eq "--svIntent") {
+      $cmdLine .= " ";
+      $cmdLine .= $main::sv_intents[rand(@main::sv_intents)];
+    }
+    if ($opt eq "--enable_parameters") {
+      my $disable;
+      $cmdLine .= " ";
+      $disable = int(rand(1));
+      if ($disable == 1) {
+        $cmdLine .= $main::param_sub_options[rand(@main::param_sub_options)];
+      }
+    }
+    if ($opt eq "--vh_scaling") {
+      $cmdLine .= " --designs ".int(rand(20)+1);
+      $cmdLine .= " --hexpand ".int(rand(20)+1);
+      $cmdLine .= " --vexpand ".int(rand(5)+1);
+    }
+    if ($opt eq "--struct_union") {
+      my $disable;
+      $cmdLine .= " ";
+      my $choose = $choice[rand(@choice)];
+      $cmdLine  .= " $choose ";
+      if($choose eq "yes"){
+        $cmdLine .= " --num_struct_union ".int(rand(3)+1);
+        $disable = int(rand(1));
+        if ($disable == 1) {
+          $cmdLine .= $main::struct_sub_options[rand(@main::struct_sub_options)];
+        }
+      }
+    }
+    if ($opt eq "--bitFactor") {
+      $cmdLine .= " ";
+      $cmdLine .= $main::factors[rand(@main::factors)];
+    }
+    if ($opt eq "--st_kind") {
+      $cmdLine .= " ";
+      $cmdLine .= $main::st_kinds[rand(@main::st_kinds)];
+    }
+    if ($opt eq "--disable_st_kind") {
+      $cmdLine .= " ";
+      $cmdLine .= $main::st_kinds[rand(@main::st_kinds)];
+    }
+
+	if($opt eq "--enable_glsgen"){
+      my $gls_option = $main::gls_options[rand(@main::gls_options)];
+
+      $cmdLine .= " $gls_option ";
+      if($gls_option eq "--enable_sdf"){
+        $cmdLine .= $main::sdf_options[rand(@main::sdf_options)];
+       }
+     }
+
+  }
+
+
+  #print "$cmdLine \n";
+  
+  print ("Test $i - ${TOOL_PATH}/autogen $cmdLine \n");
+  chdir "$test_dir";
+  `echo "/grid/common/pkgs/python/v3.6.3/bin/python3 $TOOL_PATH/autogen $cmdLine" >> $TOOL_PATH/$opt_testLog`;
+  system("/grid/common/pkgs/python/v3.6.3/bin/python3 $TOOL_PATH/autogen $cmdLine >> $TOOL_PATH/$opt_testLog");
+  chdir "$TOOL_PATH";
+}
+
+
+2.AUTOGEN PYTHON CONNECTION
+
+#! /grid/common/bin/python3.6
+
+from common.autogen_cli import *;
+from common.autogen_seed import *;
+from common.autogen_common import *;
+from common.autogen_enum import *;
+from common.autogen_shelve import *;
+from common.autogen_scaling import *;
+from components.autogen_scope import *;
+from components.autogen_cuscope import *;
+from components.autogen_module import *;
+from components.autogen_program import *;
+from components.autogen_interface import *;
+from components.autogen_package import *;
+from common.autogen_random import *
+from components.autogen_variable import *;
+from components.autogen_instance import *;
+from components.autogen_parameters import *;
+from components.autogen_rnc import *;
+from components.autogen_gls import *;
+import common.illegal_gen as ig; 
+import config;
+import os;
+import json
+import signal
+
+class autogen_sv :
+  def __init__ (self):
+    self.sv_test   = "";
+    self.file_name = "";
+    self.tb_name   = "tb.sv";
+    self.chkr_name   = "chkr.sv";
+    self.drv_name  = "DRV.sv";
+    self.makefile  = "Makefile";
+    self.clk_gen   = "clk_generator.sv";
+    self.spice     = "amsd.scs";
+    self.upf       = "hier_top.upf";
+    self.pcm       = "pcm.sv";
+    self.Memory    = "dpRAM.sv";
+    self.version   = 2.0;
+    self.tool_path = "";
+    self._top_mod       = None;
+    self.handshake      = None;
+    self._top_intf      = None;
+    self._top_pkg       = None;
+    self._modules       = config.modules;
+    self._interfaces    = config.interfaces;
+    self._programs      = config.programs; 
+    self._packages      = config.packages;
+    self._checkers      = config.checkers;
+    self._properties    = config.properties;
+    self._sequences     = config.sequences;
+    self.define_cu      = None;
+    self._cu            = None;
+    self.drv            = None;
+    self.log            = autogen_logging("autogen", 'a');
+    self._oomr_variables  = [];
+    self._instMap_dict  = {};
+    self._intf_inst_map_dict  = {};
+    self._topInstMap_dict  = {};
+    self._global_oomrs_hier  = config.global_oomr_hierpaths;
+    self._vhScaled_global_oomrs  = [];
+    self._global_oomrs_variables  = config.global_oomrs_variables;
+    self._global_oomrs_inports  = config.global_oomrs_inports;
+    self._global_oomrs_outports  = config.global_oomrs_outports;
+    self._global_cb_oomrs_outports  = config.global_cb_oomrs_outports;
+    self._global_parameter_oomrs  = config.global_parameter_oomrs;
+    self._global_defparam_oomrs  = config.global_defparam_oomrs;
+    self._parent_modules  = [];
+    self._child_modules  = [];
+    self._top_modules  = [];
+
+  def get_version (self):
+    pass;
+    #file_path = os.path.join(self.tool_path, "N2N_AG.info")
+    #try:
+    #  info_file = open(file_path,"r")
+    #  self.version = "";
+    #  info_file.close()
+    #except FileNotFoundError:
+    #  raise Exception (strcon("N2N_AG.info does not exist at: " + file_path));
+
+  def validate_arguments(self):
+    if (config.gcli_args.mod_hier > config.gcli_args.num_modules):
+      raise Warning("Module hierarchy is greater than no of modules. Hierarchy is reduced to %d .", config.gcli_args.num_modules);
+      config.gcli_args.mod_hier = config.gcli_args.num_modules
+
+
+    if (config.gcli_args.intf_hier > config.gcli_args.num_interfaces):
+      raise Warning("Interface hierarchy is greater than no of interfaces. Hierarchy is reduced to %d .", config.gcli_args.num_interfaces);
+      config.gcli_args.intf_hier = config.gcli_args.num_interfaces
+
+    if (config.gcli_args.pkg_hier > config.gcli_args.num_packages):
+      raise Warning("Package hierarchy is greater than no of packages. Hierarchy is reduced to %d .", config.gcli_args.num_packages);
+      config.gcli_args.pkg_hier = config.gcli_args.num_packages
+    if (config.gcli_args.name != ""):
+      self.file_name = config.gcli_args.name;
+    else:
+      self.file_name = "ag_test.sv";
+
+    config.bitFactor  = config.gcli_args.bitFactor
+    config.inst_limit = config.gcli_args.inst_limit  
+    config.du_var     = config.gcli_args.designVars
+    if(config.gcli_args.disableVerific == True):
+      config.Verific  = False
+      config.enFactor = False
+    if(config.gcli_args.shortHier_config == True ):  
+      config.inst_limit = 3  
+    if(config.gcli_args.extendtHier_config == True):  
+      config.inst_limit = 15  
+    if(config.gcli_args.shortHier_config == True and config.gcli_args.extendtHier_config == True):
+     autogen_Exception(strcon(currentFuncName(),": ","illegal combination --shortHier_config & --extendtHier_config")) 
+
+    if(config.gcli_args.num_modules < 2):  
+      config.gcli_args.num_modules = 2
+      logIt(self,strcon(currentFuncName(), ": *AG_WARN, Number of modules cannot be less than 2 (ignoring user argument) "),logging_severity.HIGH);
+
+    if (len(config.gcli_args.st_kind) > 0):
+      for st_kind in list(set(config.gcli_args.st_kind) - set(config.gcli_args.disable_st_kind)):
+        config.enabled_stmt_kinds.append(stmt_dict[st_kind]);
+    else:
+      tmp_st_kinds = [];
+      for st_kind in config.gcli_args.disable_st_kind:
+        tmp_st_kinds.append(stmt_dict[st_kind]);
+      config.enabled_stmt_kinds = list(set(statement_kind) - set(tmp_st_kinds));
+    # check for module scope   
+    if( 'module' not in config.gcli_args.scope):
+      config.gcli_args.scope.append('module')
+      logIt(self,strcon(currentFuncName(), ": *AG_WARN, User didn't specify Module scope for generation, it will be added implicitly "),logging_severity.HIGH);
+
+  def copy_var(self, obj):
+    var = autogen_variable()
+    var = copy.deepcopy(obj)
+    return var
+
+  def set_top_pkg (self, pkg):
+    logIt(self,strcon(currentFuncName(), ": Top package selected : ", pkg.get_name()),logging_severity.HIGH);
+    self._top_pkg = pkg;
+
+  def set_top_intf (self, intf):
+    logIt(self,strcon(currentFuncName(), ": Top interface selected : ", intf.get_name()),logging_severity.HIGH);
+    self._top_intf = intf
+
+  def set_top_module (self,mod):
+    logIt(self,strcon(currentFuncName(), ": Top module selected : ", mod.get_name()),logging_severity.HIGH);
+    self._top_mod = mod
+    config.glTop  = mod
+
+  def add_cu (self, cu):
+    config.cu.append(cu);
+
+  def add_module (self, module):
+    module.update_id(len(self._modules))
+    self._modules.append(module);
+
+  def add_package (self, pkg):
+    pkg.update_id(len(self._packages))
+    self._packages.append(pkg);
+
+  def add_interface (self, intf):
+    intf.update_id(len(self._interfaces))
+    self._interfaces.append(intf);
+
+  def add_program (self, prog):
+    prog.update_id(len(self._programs))
+    self._programs.append(prog);
+
+  def dump_packages (self):
+    for pkg in self._packages:
+      pkg.create_decl()
+      dump_file(pkg.get_filename(), pkg)
+
+  def dump_interfaces (self):
+    for intf in self._interfaces:
+      intf.create_decl()
+      dump_file(intf.get_filename(), intf)
+
+  def dump_programs (self):
+    for prog in self._programs:
+      prog.create_decl()
+      dump_file(prog.get_filename(), prog)
+
+  def dump_modules(self):
+    for mod in self._modules:
+      if( not(hasattr(mod,"DRV"))): 
+        mod.create_decl()
+        mod.dumpAuxMod();
+      if (config.gcli_args.enable_config == True):
+        dump_file_lib(mod.get_filename(),mod,mod.libName())
+      else:
+        dump_file(mod.get_filename(),mod)
+      append_file("designBoudary.csv",strcon(mod.get_name(),",",nxtline))
+  
+  def illegalGen_enable(self):
+    if(config.gcli_args.illegal_gen == True ):
+      config.illegalGen.enable()
+
+
+  def createIntfHier(self):
+    intfs = self._interfaces.copy()
+    self.add_interface_instance()
+    self.intf_obj_for_port()
+    if (len(intfs) == 1):
+      if (self._top_intf == None):
+        self.set_top_intf(self._interfaces[0])
+    while len(intfs) > 1:
+      top_index =  gen_randint(0,len(intfs)-1)
+      top_intf =  intfs.pop(top_index)
+      if (self._top_intf == None):
+        self.set_top_intf(top_intf)
+      instN = gen_randint(1,config.intf_inst_limit)
+      for i in range(instN):
+        top_intf.add_instance(gen_choice(intfs))
+        append_file("instIntfMap", strcon(top_intf.get_name(),".",top_intf.instList[-1].get_name(),",",top_intf.instList[-1]._inst.get_name(),nxtline))
+
+  def createHier(self):
+    mod = self._modules.copy()
+    while len(mod) > 1:
+      top_index =  gen_randint(0,len(mod)-1)
+      top_mod =  mod.pop(top_index)
+      if(self._top_mod == None):
+        self.set_top_module(top_mod)
+      instN = gen_randint(1,config.inst_limit)
+      for i in range(instN):
+        top_mod.add_instance(gen_choice(mod))
+        if(top_mod.instList[-1]._kind == instance_kind.AOI):
+          for i in range(0,top_mod.instList[-1]._aoi_length+1):
+            append_file("instMap",strcon(top_mod.get_name(),".",top_mod.instList[-1].get_name(),"[",str(i),"]",",",top_mod.get_name(),nxtline))
+          self._instMap_dict[top_mod.get_name()+"."+top_mod.instList[-1].get_name()+"["+str(i)+"]"]= top_mod.get_name()
+        else:
+          append_file("instMap",strcon(top_mod.get_name(),".",top_mod.instList[-1].get_name(),",",top_mod.get_name(),nxtline))
+          self._instMap_dict[top_mod.get_name()+"."+top_mod.instList[-1].get_name()]= top_mod.get_name()
+        self._parent_modules.append(top_mod.get_name())
+        self._child_modules.append(top_mod.instList[-1]._inst.get_name())
+
+  ###Appending the instance hierarchy for instances inside generate
+  #  if (config.gcli_args.enable_generate == True):
+  #    for mod in config.modules:
+  #      for gen_obj in mod._generate_blocks:
+  #        if(gen_obj._gen_type != generate_kind.FORGEN):
+  #        elif(gen_obj._gen_type == generate_kind.FORGEN):
+  #          if (len(gen_obj._forgen_inst_list) != 0):
+     
+  def create_packages(self):
+    if ("package" in config.gcli_args.scope):
+     logIt(self,strcon(currentFuncName(), ": No of packages - ", str(config.gcli_args.num_packages)),logging_severity.HIGH);
+     for npkg in range(config.gcli_args.num_packages):
+       obj = autogen_package()
+       #package sharing for nested packages 
+       add_pkg_in_scope(obj)
+       self.add_package(obj);    
+       ## Create Parameter inside package
+       if (config.gcli_args.enable_parameters == True):
+         obj.create_parameters()
+
+       ## Create Package definition
+       obj.create()
+
+
+
+  def create_module_prototype(self):
+    if ("module" in config.gcli_args.scope):
+     logIt(self,strcon(currentFuncName(), ": No of modules - ", str(config.gcli_args.num_modules)),logging_severity.HIGH);
+     for nmod in range(config.gcli_args.num_modules):
+       obj = autogen_module()
+       obj.set_name()
+       add_pkg_in_scope(obj)
+       add_cu_in_scope(obj)
+       self.add_module(obj);    
+       if (config.gcli_args.enable_parameters == True):
+         obj.create_parameters()
+       if (config.gcli_args.enable_generate == True):
+         obj.create_generate_obj()
+
+  def create_program_prototype(self):
+    if ("program" in config.gcli_args.scope):
+     logIt(self,strcon(currentFuncName(), ": No of programs - ", str(config.gcli_args.num_programs)),logging_severity.HIGH);
+     for nprog in range(config.gcli_args.num_programs):
+       obj = autogen_program()
+       add_pkg_in_scope(obj)
+       add_cu_in_scope(obj)
+       self.add_program(obj);    
+       if (config.gcli_args.enable_parameters == True):
+         obj.create_parameters()
+
+  def create_interface_prototype(self):
+    if ("interface" in config.gcli_args.scope):
+     logIt(self,strcon(currentFuncName(), ": No of interfaces - ", str(config.gcli_args.num_interfaces)),logging_severity.HIGH);
+     for nintf in range(config.gcli_args.num_interfaces):
+       obj = autogen_interface()
+       add_pkg_in_scope(obj)
+       add_cu_in_scope(obj)
+       self.add_interface(obj);    
+       if (config.gcli_args.enable_parameters == True):
+         obj.create_parameters()
+
+  def configure_handshake_module(self):
+    config.handshakeMod = self.handshake
+    setattr(self.handshake,"noGlogic",1)
+    setattr(self.handshake,"handshake",1)
+    self.handshake.update_id(None)
+    add_pkg_in_scope(self.handshake)
+    add_cu_in_scope(self.handshake)
+    self.handshake.create()
+    self._cu._typedefs += self.handshake._typedefs;
+    self.handshake.add_instance(self._top_mod,boolean.TRUE)
+    self._top_mod._addPortList = self.handshake._variables
+    self._top_mod.add_shared_stream(self.handshake._shared.streams)
+    if(config.Verific == True):
+      setattr(self._top_mod,"Verific",1)
+    self.handshake.createLoadData()
+    setattr(self.handshake.instList[-1],"GL_Top",1)
+
+  def dump_files(self):
+    # Dump files
+    dump_file(self.define_cu.get_filename(),self.define_cu)
+    if(config.gcli_args.lp_liberty == True):
+       append_file("run.f",strcon("liberty/upf_package.sv",nxtline))   #yashb
+    self.dump_packages()
+    dump_file(self._cu.get_filename(),self._cu)
+    self.dump_interfaces()
+    self.dump_modules()
+    self.dump_programs()
+
+    if(config.gcli_args.lp_liberty == True):
+       for lib in libsUsed:     #yashb: for lowpower liberty cells instantiation
+          append_file("run.f",strcon("liberty/"+lib+".sv",nxtline))
+       append_file("run.f",strcon("-lps_lib_mfile lib.file -xmwarn NOPDCN -xmwarn NORPCN -xmwarn NORGCN",nxtline))
+
+    if (config.gcli_args.enable_config == True):
+      self.dump_config_file()
+    self.dump_xfile_file()
+   
+  def getKeysByValue(self,dictOfElements,valueToFind):
+    listOfKeys = list()
+    listOfItems = dictOfElements.items()
+    for item  in listOfItems:
+      if item[1] == valueToFind:
+        listOfKeys.append(item[0])
+    return listOfKeys
+
+  def create_global_oomrs(self):
+    mod_list = self._modules.copy()
+    intf_list = self._interfaces.copy()
+    prog_list = self._programs.copy()
+    generate_global_oomrs_hier = []
+    clocking_blocks_oomrs_hier = []
+    tf_oomrs_hier = []
+
+
+    for mod in config.modules:
+      for func in mod.get_functions():
+        append_file("instMap","tf oomrs: "+ strcon(mod.get_name(),".",func.get_name(),",",mod.get_name(),nxtline))
+        self._instMap_dict[strcon(mod.get_name(),".",func.get_name())] = mod.get_name()
+
+      for clk_blk in mod.clocking_blocks:
+        if(clk_blk.cb_sig_inp):
+          append_file("instMap","clocking block oomrs: "+ strcon(clk_blk.cb_sig_inp[0]._scope_name,".",clk_blk.get_name(),",",clk_blk.cb_sig_inp[0]._scope_name,nxtline))
+          self._instMap_dict[strcon(clk_blk.cb_sig_inp[0]._scope_name,".",clk_blk.get_name())] = clk_blk.cb_sig_inp[0]._scope_name
+
+    
+
+  ##Appending the instance hierarchy for instances of generate
+    if (config.gcli_args.enable_generate == True):
+      for mod in config.modules:
+        #mod_insts_name = [x.get_name() for x in mod.instList]
+        for gen_obj in mod._generate_blocks:
+          nestedGen = gen_obj
+          nestedGen_name = ""
+          while nestedGen is not None:
+            ##Creating hierarchies for generate inside generate
+            nestedGen_name = nestedGen_name + "." + nestedGen.get_name()
+            if (nestedGen._gen_type == generate_kind.FORGEN):
+              #print("forgen_inst_list: ",(nestedGen._forgen_inst_list))
+              if (len(nestedGen._forgen_inst_list) != 0):
+                ##this forgen_inst_list contains range of FORGEN i,e for (genvar i =0 ; i <4; i ++) where ._forgen_instlist will be pointing to 4
+                nestedGen_name = strcon(nestedGen_name ,"[",gen_choice(nestedGen._forgen_inst_list),"]")
+            #print("NESTING1 :",nestedGen_name)
+            append_file("instMap","generate oomrs: "+ strcon(mod.get_name(),nestedGen_name,",",mod.get_name(),nxtline))
+            self._instMap_dict[mod.get_name() + nestedGen_name] = mod.get_name()
+            for mod_inst in nestedGen.instList:
+            ##Creating hierarchies for modules inside generate
+              nestedGen_name2 = strcon(nestedGen_name ,".", mod_inst.get_name())
+              #print("NESTING2 :",nestedGen_name2)
+              append_file("instMap","generate oomrs: "+ strcon(mod.get_name(),nestedGen_name2,",",mod.get_name(),nxtline))
+              self._instMap_dict[mod.get_name() + nestedGen_name2] = mod.get_name()
+            nestedGen = nestedGen._nested_gen_obj
+            
+
+    
+    #Appending the OOMR hierarchies of first level of top modules
+    for i in self._instMap_dict.keys():
+      if i.split('.')[0] in self._top_modules and "cb_" not in i and "tf_" not in i:
+        if i.split('.')[0] not in self._global_oomrs_hier:
+          self._global_oomrs_hier.append(i.split('.')[0])
+        if i not in self._global_oomrs_hier:
+          self._global_oomrs_hier.append(i)
+
+    temp = len([x for x in self._global_oomrs_hier if "inst" not in x])
+    done_list = []
+    while (len(done_list)+temp != len(self._global_oomrs_hier)): 
+      for i in self._global_oomrs_hier:
+        if i not in done_list:
+          if "inst" in i and "GEN" not in i.split(".")[-1] and "cb_" not in i and "tf_" not in i:
+            nonTopMod = i.split('_inst')[-2].split('.')[-1]
+            hierPaths = self.getKeysByValue(self._instMap_dict,nonTopMod)
+            done_list.append(i)
+            if len(hierPaths) != 0:
+              for path in hierPaths:
+                if (i.split('.')[1] != path.split('.')[1]) and path.split('.')[1] not in i:
+                  if(i+ "." + path.split('.')[1] not in self._global_oomrs_hier):
+                    if "GEN" not in i+ "." + path.split('.')[1] and "cb_" not in i+ "." + path.split('.')[1] and "tf_" not in i+ "." + path.split('.')[1]:
+                      self._global_oomrs_hier.append(i+ "." + ".".join(path.split('.')[1:]))
+                    elif "GEN" in i+ "." + path.split('.')[1]:
+                      if (i+ "." + path.split('.')[1] not in generate_global_oomrs_hier):
+                        generate_global_oomrs_hier.append(i+ "." + path.split('.')[1])
+                      if (i+ "." + ".".join(path.split('.')[1:]) not in generate_global_oomrs_hier):
+                        generate_global_oomrs_hier.append(i+ "." + ".".join(path.split('.')[1:]))
+                        #self._global_oomrs_hier.append(i+ "." + ".".join(path.split('.')[1:]))
+                    elif "cb" in i+ "." + path.split('.')[1]:
+                      if (i+ "." + path.split('.')[1] not in clocking_blocks_oomrs_hier):
+                        clocking_blocks_oomrs_hier.append(i+ "." + ".".join(path.split('.')[1:]))
+                    elif "tf_" in i+ "." + path.split('.')[1]:
+                      if (i+ "." + path.split('.')[1] not in tf_oomrs_hier):
+                        tf_oomrs_hier.append(i+ "." + ".".join(path.split('.')[1:]))
+
+    ##Appending the oomrs for generate , cb and function blocks:
+    self._global_oomrs_hier.extend(generate_global_oomrs_hier + clocking_blocks_oomrs_hier + tf_oomrs_hier)
+
+
+    if(config.gcli_args.enable_oomrs == True and config.gcli_args.vh_scaling == False and config.gcli_args.disable_global_oomrs == False):
+      self.create_glbl_oomr_vars(self._global_oomrs_hier,mod_list,intf_list,prog_list);
+
+  def create_oomr_var(self,var_array=[],hier_path="",oomr_type= "",oomr_scope="", is_parameterized=boolean.FALSE):
+    for var in var_array:
+      if(var.get_vtype() != "uwire"):   
+        obj = autogen_oomr(var,hier_path)
+        if(oomr_scope == "cb"):
+          obj._is_cb_member = boolean.TRUE
+
+        if (oomr_type == "var"):
+          self.append_glb_oomr_vars(obj);
+        if (oomr_type == "input"):
+          self._global_oomrs_inports.append(obj)
+        if (oomr_type == "output"):
+          self._global_oomrs_outports.append(obj)
+        if (oomr_type == "cb_output"):
+          self._global_cb_oomrs_outports.append(obj)
+        if (oomr_type == "parameter"):
+          if(is_parameterized == boolean.TRUE):
+            if(var._is_paramport == boolean.TRUE and var._is_parameter == boolean.FALSE and var._is_local==boolean.FALSE):
+              self._global_defparam_oomrs.append(obj)
+          else:
+            if(var._is_local == boolean.FALSE and var._is_paramport == boolean.FALSE):
+              self._global_defparam_oomrs.append(obj)
+          self._global_parameter_oomrs.append(obj)
+
+  def create_glbl_oomr_vars(self,global_oomrs,mod_list,intf_list,prog_list):
+    ##Appending the variables to the hierarchies
+    
+    for i in self.select_OOMRS(global_oomrs):
+      for m in mod_list + intf_list + prog_list:
+        if i.split('.')[-1].split('_inst')[0] in m._name or "GEN" in i.split('.')[-1] or "cb_" in i.split('.')[-1] or "tf_" in i.split('.')[-1]:
+          hier_path = i
+          if "handshake" in i:
+            if(config.gcli_args.vh_scaling == False):
+              if(self.drv.instList[-1]._kind == instance_kind.AOI):
+                inst_aoi = gen_randint(0,self.drv.instList[-1]._aoi_length)
+                hier_path = "testbench_ag_test_inst.dut_ag_test_inst."+self.drv.instList[-1].get_name()+"["+str(inst_aoi)+"]"
+              else:
+                hier_path = "testbench_ag_test_inst.dut_ag_test_inst."+self.drv.instList[-1].get_name()
+            tmp = i.split(".")[1:]
+            if(len(tmp)>0):
+              hier_path += "."+".".join(tmp)
+            
+          if "GEN" not in hier_path.split('.')[-1]:
+            if "cb_" not in hier_path.split('.')[-1]:
+              if "tf_" not in hier_path.split('.')[-1]:
+                self.list_out_oomr_variables(m,hier_path)
+          
+          if "GEN" in hier_path.split('.')[-1]:
+            for gen_blk in m._generate_blocks:
+              if(gen_blk.get_name() in hier_path.split('.')[-1] ):
+                self.list_out_oomr_variables(gen_blk,hier_path)
+
+          if "tf_" in hier_path.split('.')[-1]:
+            for func in m._functions:
+              if (func._prototype._lifetime == lifetime_kind.STATIC):
+                if(func.get_name() in hier_path.split('.')[-1] ):
+                  self.list_out_oomr_variables(func,hier_path,"tf")
+
+          if "cb_" in hier_path:
+            for clk_blk in m.clocking_blocks:
+              if(clk_blk.get_name() in hier_path.split('.')[-1] ):
+                for cbVar in clk_blk.cb_sig_inp + clk_blk.cb_sig_ino +  clk_blk.cb_sig_out:
+                  self.create_oomr_var([cbVar],hier_path,"input","cb")
+                for cbVar in clk_blk.cb_sig_out + clk_blk.cb_sig_ino:
+                  self.create_oomr_var([cbVar],hier_path,"cb_output","cb")
+
+  def list_out_oomr_variables(self,m,hier_path,type="module"):
+    for v in m._variables :
+      if(v.get_type_kind() in [ data_types.STRUCT,data_types.UNION]):
+        self.create_oomr_var(v.get_members().values(),hier_path,"var")
+      else:
+        self.create_oomr_var([v],hier_path,"var")
+    
+    if (type != "tf"):
+      for port_var in m._ports["input"]:
+        if(port_var.get_type_kind() in [ data_types.STRUCT,data_types.UNION]):
+          self.create_oomr_var(port_var.get_members().values(),hier_path,"input")
+        else:
+          self.create_oomr_var([port_var],hier_path,"input")
+
+      for port_var in m._ports["output"]:
+        if(port_var.get_type_kind() in [ data_types.STRUCT,data_types.UNION]):
+          self.create_oomr_var(port_var.get_members().values(),hier_path,"output")
+        else:
+          self.create_oomr_var([port_var],hier_path,"output")
+
+      for port_var in m._parameters + m._parameter_ports + m._local_parameters:
+        if(port_var.get_type_kind() in [ data_types.STRUCT,data_types.UNION]):
+          self.create_oomr_var(port_var.get_members().values(),hier_path,"parameter", m._is_parameterized)
+        else:
+          self.create_oomr_var([port_var],hier_path,"parameter", m._is_parameterized)
+
+  def select_OOMRS(self,OOMR_list):
+    sel = gen_randint(1,len(OOMR_list))
+    #Restricting the number of OOMR hierarchies to 50
+    if (sel > 50):
+      sel = gen_randint(1,50)
+    sel_OOMRS = gen_sample(OOMR_list,sel)
+    return sel_OOMRS
+
+
+
+  def append_glb_oomr_vars(self, oomr_variable):
+    self._global_oomrs_variables.append(oomr_variable)
+
+
+
+  def create_config_file(self):
+    lib_map = {}
+    count = 1 
+    lib_decl = strcon("default liblist ")
+    if(config.gcli_args.enable_glsgen == True):
+      lib_decl += " cells "
+    for k,v in config.lib_count.items():
+      lib_map[k] = gen_randint(count,v)
+      lib_decl += strcon(" lib" + str(gen_randint(count,v)))
+      count = v + 1
+
+    if (len(self._top_modules) > 1) and (config.gcli_args.vh_scaling == False):
+      parallel_top_mod = [mod for mod in self._top_modules if "mod" in mod]
+      design_decl = strcon("config AG_TOP;",nxtline,"design worklib.testbench_ag_test_inst")
+      for i in range(0,len(parallel_top_mod)):
+        index = lib_map[parallel_top_mod[i]]
+        design_decl += " lib" + str(index) +"."+parallel_top_mod[i] + " "
+      design_decl += ";"+nxtline
+    else:
+      design_decl = strcon("config AG_TOP;"+nxtline+"design worklib.testbench_ag_test_inst;"+nxtline)
+    instance_list = self._global_oomrs_hier.copy()
+    temp_list = []
+    for i in instance_list:
+      if "handshake_"  in i :
+        temp_list.append(i)
+    for i in temp_list: 
+      if "handshake_"  in i and "." not in i:
+        temp_list.remove(i)
+      else:
+        temp_list[temp_list.index(i)] = i.split(".",1)[1]
+    temp_list[0] = temp_list[0].split(".",1)[1] 
+    instance_list = temp_list    
+    config_decl = design_decl + lib_decl;
+    count = 1
+    inst_list = []
+    config_decl += strcon(";"+nxtline)
+    for k,v in config.lib_count.items():
+      if(k in config.bindTarget_list):
+        continue
+      for i in instance_list:
+        if k in i.split(".")[-1]:   
+          inst_list.append(i)
+      stmt_type = gen_choice(['cell','instance'])
+      if len(inst_list) != 0 and stmt_type == 'instance':
+        config_decl += strcon("instance testbench_ag_test_inst.dut_ag_test_inst."+self.drv.instList[-1].get_name()+"."+ str(gen_choice(inst_list)))
+        config_decl += strcon(" liblist "+"lib"+str(gen_randint(count,v)) +";"+nxtline)
+      elif len(inst_list) != 0 and stmt_type == 'cell':
+        config_decl += strcon("cell "+k.split(".")[0]+" liblist "+"lib"+str(gen_randint(count,v)) +";"+nxtline)
+      count = v + 1
+      inst_list.clear()
+    config_decl += strcon("endconfig") 
+    return config_decl
+
+  def dump_config_file(self):
+    write_file("conf.sv",self.create_config_file())
+    append_file("run.f",strcon("conf.sv -top AG_TOP -compcnfg",nxtline))
+
+
+  def create_xfile_file(self):
+    instance_list = self._global_oomrs_hier.copy()
+    mod_list = []
+    for mod in self._modules:
+      mod_list.append(mod.get_name())
+    xfile_decl = ""
+    initial_hirerachy = strcon("testbench_ag_test_inst.dut_ag_test_inst.", self.drv.instList[-1].get_name())
+    mixed_list = instance_list + mod_list
+    no_of_rules = gen_randint(1,len(mixed_list))
+    flag = 0
+    back_slash = "\\"
+    for rule_itr in range(0,no_of_rules):
+      rule_type = gen_choice(list(xprop_rules_kind))
+      scope_type = gen_choice(list(xprop_scope_kind))
+      deep_hirarchy = gen_choice(list(boolean))
+      if scope_type == xprop_scope_kind.MODULE and len(mod_list) == 0:
+        scope_type = xprop_scope_kind.SCOPE
+      if scope_type == xprop_scope_kind.SCOPE and len(instance_list) == 0:
+        scope_type = xprop_scope_kind.MODULE
+      if scope_type == xprop_scope_kind.MODULE:
+        random.shuffle(mod_list)
+        rand_mod = mod_list.pop()
+        xfile_decl += "MODULE " + rand_mod
+      else:
+        mod_obj = None
+        ext_decl = ""
+        random.shuffle(instance_list)
+        rand_inst = instance_list.pop()
+        mod_inst  = rand_inst.split(".")[-1]
+        for mod in self._modules:
+          if mod.get_name() in mod_inst:
+            mod_obj = mod
+        if mod_obj != None:
+          mod_scope_type = gen_choice(list(xprop_mod_scope_kind))
+          if mod_scope_type == xprop_mod_scope_kind.GENERATE:
+            if len(mod_obj._generate_blocks) != 0:
+              gen_obj = gen_choice(mod_obj._generate_blocks)
+              if gen_obj._gen_type == generate_kind.FORGEN:
+                ext_decl += "." + gen_obj.get_name() + "[0]"
+              else:
+                ext_decl += "." + gen_obj.get_name()
+          elif mod_scope_type == xprop_mod_scope_kind.TASK:
+            if len(mod_obj._tasks) != 0:
+              task_obj = gen_choice(list(mod_obj._tasks))
+              ext_decl += strcon("." , task_obj.get_name())
+              if back_slash in task_obj.get_name():
+                flag = 1
+          elif mod_scope_type == xprop_mod_scope_kind.FUNCTION: 
+            if len(mod_obj._functions) != 0:
+              func_obj = gen_choice(list(mod_obj._functions))
+              ext_decl += strcon("." , func_obj.get_name())
+              if back_slash in func_obj.get_name():
+                flag = 1
+        xfile_decl += "SCOPE " + initial_hirerachy + rand_inst + ext_decl
+      if deep_hirarchy == boolean.TRUE:
+        if flag == 0:
+          xfile_decl += "..."
+        else:
+          xfile_decl += " ..."
+          flag = 0
+      if rule_type == xprop_rules_kind.CAT:
+        xfile_decl += " C"
+      elif rule_type == xprop_rules_kind.FOX:
+        xfile_decl += " F"
+      else:
+        xfile_decl += " D"
+      xfile_decl += " " + nxtline
+    return xfile_decl
+
+  def dump_xfile_file(self):
+    write_file("xfile.txt",self.create_xfile_file())
+ 
+ 
+  def add_interface_instance (self):
+   loc_modules = self._modules.copy()
+   loc_intf = self._interfaces 
+   if (len(loc_modules) > 0) and (len(loc_intf) > 0)  :  
+    num_mod_sel = gen_randint(1,len(loc_modules)-1)
+    num_intf_sel = gen_randint (1, config.intf_inst_limit)
+    for mod_sel in range(num_mod_sel): 
+     mod_intf_pair = []   
+     mod_obj = loc_modules.pop(gen_randint(0,len(loc_modules)-1))
+     mod_intf_pair.append(mod_obj)
+     for intf_self in range(num_intf_sel):
+      intf_obj = gen_choice(loc_intf)   
+      mod_obj.add_instance(intf_obj)   
+
+     logIt(self,", Module-Interface Pair " + str (mod_obj.get_name()) + " : "  + str(list(mod_obj.intf_list.keys())),logging_severity.HIGH)
+     for intf in list(mod_obj.intf_list.keys()):
+       append_file("instMap",str (mod_obj.get_name()) + "."  + str(intf)+ "," + str(intf.split('_inst')[0]) + "\n")
+       self._instMap_dict[str(mod_obj.get_name()) + "."  + str(intf)]= str(mod_obj.get_name())
+
+     #for m in config.modules:
+     #  for p in m._parameters:
+     #    print(m.get_name() + "." + p.get_param_name() + "," + m.get_name())
+     #    self._instMap_dict[m.get_name() + "." + p.get_param_name()]= str(m.get_name())
+  ##---- new API to choose module + interface -----------## 
+  def intf_obj_for_port(self):
+   loc_mod = self._modules.copy()
+   if (len(loc_mod) > 0) and (len(self._interfaces) > 0)  :  
+    num_mod = gen_randint(1,len(loc_mod))
+    for mod in range(num_mod):
+     mod_obj = loc_mod.pop(gen_randint(0,len(loc_mod)-1))
+     loc_intf = self._interfaces.copy() 
+     num_intf_sel = gen_randint(1, len(loc_intf))
+     for intf in range(num_intf_sel):        
+      intf_obj = loc_intf.pop(gen_randint(0,len(loc_intf)-1))
+      mod_obj.intf_obj_port[intf_obj.get_name()] = intf_obj 
+    
+  ##-----------------------------------------------------## 
+
+  def createRnc(self):
+    ## integration with rnc_n2n
+    if(config.gcli_args.enable_rnc == True):
+      rnc  =  autogen_rnc()
+      rnc.runRnc()
+      if(config.gcli_args.uvm == False):
+        append_file("tb.f",strcon("rnc_n2n.sv",nxtline))
+
+  def createGG(self):
+    ## integration with GG
+    if(config.gcli_args.enable_glsgen == True):
+      gls  =  autogen_gls()
+      gls.dumpCells()
+
+  def createDRV(self,tmp_drv):
+    self.drv = autogen_module(prefix="DRV_",no_Aux=True)
+    config.drv = self.drv
+    setattr(self.drv,"DRV",1)
+    self.drv.add_instance(self.handshake)
+    self.add_module(self.drv);    
+    setattr(self.drv.instList[-1],"handshake",1)
+    tmp_drv = str.replace(tmp_drv,"MOD_INST",self.drv.instList[-1].get_decl() )
+    self.drv._decl = str.replace(tmp_drv,"drv_NAME",self.drv.get_name())
+
+
+
+  def dumpTest(self):
+    tmp_tb    = ""
+    tmp_chkr    = ""
+    tmp_make  = "";
+    tmp_Mem   = "";
+    tmp_clk   = "";
+    tmp_spice = "";
+    tmp_upf   = "";
+    tmp_pcm   = "";
+    tmp_init  = "";
+
+    if(config.gcli_args.uvm == True):
+      copy_dir(self.tool_path+"/testbench/uvm",os.getcwd()+"/uvm")
+      self.tb_name = "./uvm/top/tb.sv"
+      os.chmod(self.tb_name,0o777)
+      if(config.gcli_args.enable_rnc == True):
+        seq = os.path.join(os.getcwd(),"uvm/sequences/n2n_sequence_item.svh")
+        os.chmod(seq,0o777)
+        tmp_seq = ""
+        tmp_seq = read_file(file=seq)
+        tmp_seq = str.replace(tmp_seq,"//INCLUDE_RNC","`include \"rnc_n2n.sv\" ")
+        tmp_seq = str.replace(tmp_seq,"//POST_RAND",autogen_rnc.uvmPost())
+        write_file(seq, tmp_seq)
+    file_path = os.path.join(self.tool_path, "testbench/tb.sv")
+    if(config.gcli_args.uvm == True):
+      file_path = os.path.join(self.tool_path, "testbench/uvm/top/tb.sv")
+    tmp_tb = read_file(file=file_path)  
+    file_path = os.path.join(self.tool_path, "stdSetup/Makefile")
+    tmp_make = read_file(file=file_path)
+    file_path = os.path.join(self.tool_path, "stdSetup/dpRAM.sv")
+    tmp_Mem = read_file(file=file_path)
+    if(config.gcli_args.lp_init == True):
+     file_path = os.path.join(self.tool_path, "testbench")
+     tmp_chkr = read_file(file_path, "chkr_init.sv")
+     write_file(self.chkr_name, tmp_chkr)
+    ## Dump source files
+    self._cu.create_decl();
+    self.dump_files();
+
+    tmp_tb = str.replace(tmp_tb,"FILE","ag_test_inst")
+    tmp_tb = str.replace(tmp_tb,"TBNAME",self.drv.get_name())
+
+    if(config.gcli_args.enable_sdf_annotate == True):
+      tmp_tb = str.replace(tmp_tb,"SDF_ANNOTATION",autogen_gls.sdf_anno_fxn())
+    else:
+      tmp_tb = str.replace(tmp_tb,"SDF_ANNOTATION","")
+
+    if(config.gcli_args.uvm == False):
+      tmp_tb = str.replace(tmp_tb,"PACKET_RNC",autogen_rnc.tbPacket())
+    write_file(self.tb_name, tmp_tb)
+    append_file("tb.f",strcon(self.tb_name,nxtline))
+    file_path = os.path.join(self.tool_path, "stdSetup/dpi_tcl.c")
+    copy_file(file_path,os.path.join(os.getcwd(),"dpi_tcl.c"))
+    append_file("tb.f",strcon("dpi_tcl.c",nxtline))
+    write_file(self.makefile, tmp_make)
+    append_file("designBoudary.csv",strcon("testbench_ag_test_inst",",",nxtline))
+
+    file_path = os.path.join(self.tool_path, "testbench/clk_generator.sv")
+    tmp_clk   = read_file(file=file_path)
+
+    file_path = os.path.join(self.tool_path, "testbench/amsd.scs")
+    tmp_spice  = read_file(file=file_path)
+    write_file(self.clk_gen, tmp_clk)
+    write_file(self.spice, tmp_spice)
+
+
+    #-- this to dump ".c" file for DPI data propagation --#
+    if config.C_placeholder != None: 
+     write_file("test.c", config.C_placeholder) 
+     append_file("run.f","test.c \n")
+     file_path = os.path.join(self.tool_path, "stdSetup/test.h")
+     copy_file(file_path,os.path.join(os.getcwd(),"test.h"))
+
+    if(config.MemInst > 0):
+      write_file(self.Memory, tmp_Mem)
+      append_file("run.f",strcon("dpRAM.sv",nxtline))
+      append_file("designBoudary.csv",strcon("dpRAM",",",nxtline))
+
+    if(config.gcli_args.lp_init == True):
+      append_file("run.f",strcon("chkr.sv",nxtline))
+
+    if(config.gcli_args.uvm == True):
+      append_file("tb.f",strcon("-uvm",nxtline))
+      append_file("tb.f",strcon("+UVM_TESTNAME=n2n_test ",nxtline))
+      append_file("tb.f",strcon("-incdir uvm ",nxtline))
+
+    if(len(config.cells) > 0):
+      if(config.gcli_args.enable_config == False):
+        append_file("run.f",strcon("-y ./cells",nxtline))
+        append_file("run.f",strcon("+libext+.sv+.v",nxtline))
+      else:
+        append_file("run.f",strcon("-makelibpost cells ./cells/*.*v -libext+.sv+.v -endlib",nxtline))
+      append_file("run.f",strcon("-f ./cells/gls_opt_file ",nxtline))
+         
+
+  def createTest(self):
+    ## Check DRV template
+    tmp_drv   = ""
+
+    file_path = os.path.join(self.tool_path, "testbench/DRV.sv")
+    tmp_drv   = read_file(file=file_path) 
+
+    ## Generate seed value
+    seed = autogen_seed();
+    if (config.gcli_args.seed == None):
+      seed.set_default_seed();
+    else:
+      seed.set_seed(config.gcli_args.seed)
+
+    ## Set global seed 
+    config.gSEED = seed.get_seed();
+    logIt(self,", SEED: " + str(config.gSEED),logging_severity.HIGH)
+    # choice illegal mode 
+    self.illegalGen_enable()
+
+    ### Generate CU scope
+    ## Common CU `defines  
+    self.define_cu = autogen_cu();
+    self.define_cu._name = "defines";
+    defined_pack_dim,defined_unpack_dim = define_dim("")
+    self.define_cu._defines = mergeDict(defined_pack_dim,defined_unpack_dim)
+    if(config.gcli_args.uvm == True):
+      self.define_cu._defines['GLOBAL_TIMEOUT'] = 10000  ## new statement for config file 
+    else:
+      self.define_cu._defines['GLOBAL_TIMEOUT'] = 1000000 
+    self.define_cu.create_decl()
+
+
+    ## Placeholder to create packages
+    self.create_packages();
+    ## Common CU 
+    self._cu =  autogen_cu()
+    self._cu._name  = "cu_common"
+    add_pkg_in_scope(self._cu)
+    self._cu.create();
+    self.add_cu(self._cu)
+
+    logIt(self,strcon("scopes ::", str(config.gcli_args.scope)),logging_severity.HIGH);
+
+    ## Run rnc_n2n
+    self.createRnc()
+    ## Run GG
+    self.createGG()
+
+
+    ## Placeholder to create Modules
+    self.create_module_prototype();
+
+    ## Placeholder to create Interfaces
+    self.create_interface_prototype();
+
+    ## Create Interface Instance hierarchy 
+    self.createIntfHier()
+    
+    ## Create Instance hierarchy 
+    self.createHier()
+
+
+    ## Create Handshake module
+    self.handshake = autogen_module(prefix="handshake_",AUX=True)
+    self.add_module(self.handshake)
+    self.configure_handshake_module();
+
+    ## Placeholder to create Programs
+    self.create_program_prototype();
+    
+    ## Create Module definition
+    for mod in self._modules:
+      if(not(hasattr(mod,"handshake"))):
+        mod.create()
+
+    ## Create Interface definition
+    for intf in self._interfaces:
+      intf.create()
+
+    ## Create Program definition
+    for prog in self._programs:
+      prog.create()
+
+    ## Instance Maps
+    if(self.handshake.instList[-1]._kind == instance_kind.AOI):
+      for i in range(0,self.handshake.instList[-1]._aoi_length+1):
+        append_file("instMap",strcon(self.handshake.get_name(),".",self.handshake.instList[-1].get_name(),"[",str(i),"]",",",self.handshake.get_name(),nxtline))
+        self._instMap_dict[self.handshake.get_name()+"."+self.handshake.instList[-1].get_name()+"["+str(i)+"]"]= self.handshake.get_name()
+    else:
+      append_file("instMap",strcon(self.handshake.get_name(),".",self.handshake.instList[-1].get_name(),",",self.handshake.get_name(),nxtline))
+      self._instMap_dict[self.handshake.get_name()+"."+self.handshake.instList[-1].get_name()]= self.handshake.get_name()
+    self._parent_modules.append(self.handshake.get_name())
+    self._child_modules.append(self.handshake.instList[-1]._inst.get_name())
+    self._top_modules = set(self._parent_modules).difference(set(self._child_modules))
+
+
+
+    ## Create DRV module
+    self.createDRV(tmp_drv)
+    
+
+  def shelve_clear_nmspc(self,absPath,relPath,designName):
+    # create shelve DB 
+    shelv =  autogen_shelve("agTestDb")
+    shelv.add("packages",self._packages)
+    shelv.add("cu",config.cu)
+    shelv.add("checkers",self._checkers)
+    shelv.add("properties",self._properties)
+    shelv.add("sequences",self._sequences)
+    shelv.add("interfaces",self._interfaces)
+    shelv.add("programs",self._programs)
+    shelv.add("modules",self._modules)
+    shelv.add("drv",[self.drv])
+    shelv.add("oomrs",self._global_oomrs_hier)
+    shelv.add("absPath",absPath)
+    shelv.add("relPath",relPath)
+    shelv.add("designName",designName)
+    shelv.add("C_placeholder",False)
+    shelv.add("MemInst",False)
+    shelv.add("glsCells",False)
+    if config.C_placeholder != None: 
+      shelv.add("C_placeholder",True)
+    if(config.MemInst > 0):
+      shelv.add("MemInst",True)
+    if(len(config.cells) > 0):
+      shelv.add("glsCells",True)
+    shelv.close()  
+    #clear arrays
+    self._modules.clear()     
+    self._interfaces.clear()  
+    self._programs.clear()
+    self._packages.clear()    
+    self._checkers.clear()    
+    self._properties.clear()  
+    self._sequences.clear()   
+    self._top_mod = None
+    config.C_placeholder = None
+    config.cu.clear()
+    self._global_oomrs_hier.clear()
+
+
+  def handler (self, signum, frame):
+    print ("Timeout !!");
+    raise Exception("end of time");
+
+  
+  def setLogger (self):
+    config.logger = self.log;
+
+
+
+  def start (self):
+    ## Set tool path before doing any other processing.
+    self.tool_path = os.path.dirname(os.path.realpath(__file__));
+    config.tool_path = self.tool_path
+    #self.get_version();
+
+    ## Parse arguments
+    ag_cla = autogen_cli();
+    ag_cla.add_arguments();
+    ag_cla.parse_arguments();
+
+    config.gcli_args = ag_cla.args;
+    logIt(self,str(ag_cla),logging_severity.HIGH);
+
+    ## Validate arguments
+    self.validate_arguments();
+
+    ## AG randomization wrapper
+    config.autogen_random = autogen_Random();
+    if (config.gcli_args.timeout > 0):
+      signal.signal(signal.SIGALRM, self.handler);
+      signal.alarm(config.gcli_args.timeout);
+
+    ## IllegalGen
+    config.illegalGen = ig.illegal_gen()
+
+    logIt(self,"// N2N AG version: " + str(self.version),logging_severity.HIGH)
+
+    ## User defined dimensions
+    config.defined_pack_dim,config.defined_unpack_dim = define_dim() 
+    ## GLobal variable generator
+    compute_pack_unpack_dims()
+    config.ag_data  = autogen_datatype()
+    config.ag_data.set_test_flags()
+
+
+    if(config.gcli_args.vh_scaling == False):
+      # Create test/s
+      self.createTest()
+
+      for mod in config.modules:
+        mod.insts_in_generate()
+      
+      ### Create OOMRs      
+      if(config.gcli_args.enable_oomrs == True or config.gcli_args.enable_config == True and config.gcli_args.disable_global_oomrs == False):  
+        self.create_global_oomrs();
+      self.dumpTest()
+    else:
+      self.create_vh_scaling()
+    if(config.gcli_args.lp_liberty == True):
+       os.mkdir(os.path.join(os.getcwd(),"liberty")) # @yashb : for Low Power Liberty cells Instantiaiton randomly 
+       shutil.copyfile(os.path.join(pathLiberty,"","upf_package.sv"),os.path.join(os.getcwd(),"liberty","upf_package.sv"))
+       f1 = open(os.path.abspath(os.getcwd()+"/lib.file"),"x")
+       for mod in libsUsed:
+         shutil.copyfile(os.path.join(pathLiberty,"lib",mod+".lib"),os.path.join(os.getcwd(),"liberty",mod+".lib"))
+         shutil.copyfile(os.path.join(pathLiberty,"dut",mod+".sv"),os.path.join(os.getcwd(),"liberty",mod+".sv"))
+         f1.write("liberty/"+mod+".lib \n")
+       f1.close
+
+  def create_vh_scaling(self):
+    work = os.getcwd()
+    llt =  os.path.join(work,"LLT")
+    logIt(self,strcon("Scalability mode "),logging_severity.HIGH)
+    logIt(self,strcon("Creating LLT(s) "),logging_severity.HIGH)
+    logIt(self,strcon("Changing work directory ->",llt),logging_severity.HIGH)
+    os.mkdir(llt)
+    os.chdir(llt)
+    map = {"lltAbs":llt,"lltRel":"./LLT","ndesigns":config.gcli_args.designs}
+    write_file("llt.json",json.dumps(map,indent=2))
+    os.symlink(strcon(llt,"/llt.json"),strcon(work,"/llt.json"))
+    for des in range(0,config.gcli_args.designs):
+      logIt(self,strcon("Creating : design_",str(des)),logging_severity.HIGH)
+      print(strcon("Creating : design_",str(des)))
+      design =  os.path.join(llt,strcon("design_",str(des)))
+      os.mkdir(design)
+      os.chdir(design)
+      # Create test/s
+      try:
+        self.createTest()
+        self.create_global_oomrs();
+        self.dumpTest()
+      except Exception as exc:  
+        print(traceback.format_exc())
+        raise
+      #Dump test
+      self.shelve_clear_nmspc(absPath=design,relPath=strcon("./LLT/design_",str(des)),designName=strcon("design_",str(des)))
+      os.chdir(llt)
+    os.chdir(work)
+    logIt(self,strcon("LLT(s) generated "),logging_severity.HIGH)
+    scale = autogen_scaling()
+    scale.loadJSON()
+    scale.loadTestDB()
+    scale.createHLT()
+    self.create_glbl_vhScaled_oomr_vars(scale);
+    scale.dumpTest()
+
+  def create_glbl_vhScaled_oomr_vars(self,scale):
+    ##Creating Global OOMRS for VH scaled Modules
+    LLT_hierPaths = scale.extrctKey("oomrs")
+    LLTs = scale.extrctKey("modules")
+    LLT_mods = [item for sublist in LLTs for item in sublist]
+    
+
+    DRVs = scale.extrctDrvKey()
+    DRV_hierPaths = []
+
+    MLT_mods = scale.mlt.copy()
+    HLT_mod = scale.hlt
+    HLT_MLT_DRV_hierPaths = []
+    for top_mod in MLT_mods:
+      for inst in top_mod.instList:
+        append_file("topInstMap",strcon(top_mod.get_name(),".",inst.get_name(),",",inst.get_name(),nxtline))
+        self._topInstMap_dict[top_mod.get_name()+"."+inst.get_name()]= top_mod.get_name()
+    for i in HLT_mod.instList:
+        append_file("topInstMap",strcon(HLT_mod.get_name(),".",i.get_name(),",",i.get_name(),nxtline))
+        self._topInstMap_dict[HLT_mod.get_name()+"."+i.get_name()]= HLT_mod.get_name()
+    for DRV in DRVs:
+      for i in DRV.instList:
+        append_file("topInstMap",strcon(DRV.get_name(),".",i.get_name(),",",i.get_name(),nxtline))
+        self._topInstMap_dict[DRV.get_name()+"."+i.get_name()]= DRV.get_name()
+    
+    
+    for i in self._topInstMap_dict.keys():
+      if (i.split('.')[0] == HLT_mod.get_name()):
+        if i.split('.')[0] not in HLT_MLT_DRV_hierPaths:
+          HLT_MLT_DRV_hierPaths.append(i.split('.')[0])
+          self._vhScaled_global_oomrs.append(i.split('.')[0])
+        if i not in HLT_MLT_DRV_hierPaths:
+          HLT_MLT_DRV_hierPaths.append(i)
+          self._vhScaled_global_oomrs.append(i)
+
+
+    temp = len([x for x in HLT_MLT_DRV_hierPaths if "inst" not in x])
+    done_list = []
+    while (len(done_list)+temp != len(HLT_MLT_DRV_hierPaths)): 
+      for i in HLT_MLT_DRV_hierPaths:
+        if i not in done_list:
+          if "inst" in i:
+            nonTopMod = i.split('_inst')[-2].split('.')[-1]
+            hierPaths = self.getKeysByValue(self._topInstMap_dict,nonTopMod)
+            done_list.append(i)
+            if len(hierPaths) != 0:
+              for path in hierPaths:
+                if (i.split('.')[1] != path.split('.')[1]):
+                  if(i+ "." + path.split('.')[1] not in HLT_MLT_DRV_hierPaths):
+                    HLT_MLT_DRV_hierPaths.append(i+ "." + path.split('.')[1])
+                    self._vhScaled_global_oomrs.append(i+ "." + path.split('.')[1])
+
+    lltFlatList = [item for sublist in LLT_hierPaths for item in sublist]
+    
+    for m in HLT_MLT_DRV_hierPaths:
+      for d in lltFlatList:
+        if "inst" in m:
+          if "inst" in d:
+            if (m.split(".")[-1].split("_inst")[0] == d.split(".")[0]):
+              if m + "." + '.'.join(d.split(".")[1:]) not in self._vhScaled_global_oomrs:
+                self._vhScaled_global_oomrs.append(m + "." + '.'.join(d.split(".")[1:]))
+
+    ##Reducing the oomrs
+    sel = gen_randint(1,len(self._vhScaled_global_oomrs))
+    #Restricting the number of VH scaled OOMR hierarchies to 100
+    if (sel > 100):
+      sel = gen_randint(1,100)
+
+    sel_vhScaled_global_oomrs = gen_sample(self._vhScaled_global_oomrs,sel)
+    ##Appending the variables to the hierarchies
+    for i in sel_vhScaled_global_oomrs:
+      for mod in LLT_mods + MLT_mods:
+        if(i.split(".")[-1].split("_inst")[0] == mod.get_name()):
+          for v in mod._variables:
+            if (v.get_vtype() != "uwire"):
+              hier_path = i
+              final_hier = ".".join(hier_path.split(".")[1:])
+              final_hier = strcon("tbench_top.DUT",".",final_hier)
+              if(v.get_type_kind() in [ data_types.STRUCT,data_types.UNION]):
+                self.create_oomr_var(v.get_members().values(),final_hier,"var")
+              else:
+                self.create_oomr_var([v],final_hier,"var")
+
+3.CONFIG
+
+tool_path   = ""
+gcli_args   = None;
+gSEED       = 0;
+autogen_random  = None;
+ag_data     = None;
+seed        = gSEED;
+modules     = []
+interfaces  = []
+interfaces  = []
+checkers    = []
+packages    = []
+properties  = []
+sequences   = []
+programs    = []
+cu          = []
+cells       = []
+cells_cds   = []
+drv         = None
+glTop       = None
+num_modules = 5
+num_interfaces = 5
+num_programs = 2
+num_cells    = 10
+lib_count   = {}
+global_oomrs_variables = []
+global_oomr_hierpaths = []
+global_oomrs_inports = []
+global_oomrs_outports = []
+global_cb_oomrs_outports = []
+global_parameter_oomrs = []
+global_defparam_oomrs = []
+Proc_Limit  = 5;
+Func_Limit  = 5;
+Task_Limit  = 5;
+Para_Limit  = 10;
+CB_Limit    = 5;
+Modp_Limit  = 5;
+Mod_Identifier_Len = 50;
+Other_Identifier_Len = 10;
+Event_List_Limit = 10;
+pack_dim_vals   = {}
+unpack_dim_vals = {}
+defined_pack_dim   = {}
+defined_unpack_dim = {}
+gtypes          = [];
+ag_dtp = None
+cu_var  =  10
+du_var  =  10
+du_param =  10
+pkg_var =  10
+handshakeMod = None
+structUnion_var = 5
+inst_limit = 5
+intf_inst_limit = 2
+dataInSz=32
+bitFactor=32
+enFactor=True
+Verific=True
+C_placeholder = None
+illegalGen = None
+### Tracking var
+MemInst=0
+genVarN=0
+LoopN=0
+tmpNodes=0
+assert_lower_limit = 10
+assert_upper_limit = 30
+immd_assert_lower_limit = 5
+immd_assert_upper_limit = 10
+SIA_lower_limit = 5
+SIA_upper_limit = 10
+ODA_lower_limit = 5
+ODA_upper_limit = 10
+FDA_lower_limit = 5
+FDA_upper_limit = 10
+conc_assert_lower_limit = 5
+conc_assert_upper_limit = 10
+seq_lower_limit = 5
+seq_upper_limit = 10
+prop_lower_limit =7
+prop_upper_limit = 13
+seq_delay_upper_limit = 10
+seq_delay_lower_limit = 0 
+expr_depth = 4
+no_of_stmts = 5
+no_of_blk_stmts = 5
+cont_assign_lower_limit = 5
+cont_assign_upper_limit = 10
+logger = None
+aoi_length = 3
+bindLimit = 1
+bindTarget_list = []
+enabled_stmt_kinds = []
+gen_nesting_depth = 2
+otf_variables = []
+
+4.
